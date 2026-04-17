@@ -1,0 +1,32 @@
+logLevel: info
+
+rtmp: yes
+rtmpAddress: :1935
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8188
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+
+hls: no
+
+api: yes
+apiAddress: :8888
+authMethod: internal
+authInternalUsers:
+  - user: any
+    ips: []
+    permissions:
+      - action: publish
+      - action: read
+      - action: api
+      - action: playback
+      - action: metrics
+      - action: pprof
+
+paths:
+  all_others:
+    source: publisher

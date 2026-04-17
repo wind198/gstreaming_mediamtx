@@ -1,0 +1,20 @@
+version: '3.9'
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: fleet_mediamtx_dev
+    restart: unless-stopped
+    ports:
+      - '8888:8888' # API
+      - '8889:8889' # WebRTC / WHIP
+      - '1935:1935' # RTMP
+      - '8554:8554' # RTSP
+      - '8188:8188' # WebRTC ICE/TCP
+      - '8189:8189/udp' # WebRTC ICE/UDP
+      - '8000:8000/udp' # RTP
+      - '8001:8001/udp' # RTCP
+      - '8890:8890/udp' # SRT
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    command: ['/mediamtx.yml']
