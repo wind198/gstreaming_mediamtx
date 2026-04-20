@@ -1,0 +1,8 @@
+[package]
+name = "whip-publish"
+version = "0.1.0"
+edition = "2021"
+description = "MP4 → WHIP loop via GStreamer (EOS dropped + seek before whipclientsink)"
+
+[dependencies]
+gstreamer = "0.23"

@@ -1,0 +1,100 @@
+# GStreamer + gst-plugins-rs (whipclientsink) + C++ whip-publish-cpp binary.
+#
+# gst-plugins-rs 0.14 needs GStreamer >= 1.22 — Ubuntu 24.04 packages satisfy this.
+#
+# Build: docker build -f Dockerfile.cpp_whip -t whip_cpp_gstreamer:local .
+
+FROM ubuntu:24.04 AS plugin-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    pkg-config \
+    build-essential \
+    clang \
+    cmake \
+    libssl-dev \
+    libglib2.0-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-bad1.0-dev \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+
+ENV PATH="/root/.cargo/bin:$PATH"
+
+RUN rustup default stable \
+  && cargo install cargo-c
+
+WORKDIR /src
+RUN git clone --depth 1 --branch 0.14 https://github.com/GStreamer/gst-plugins-rs.git .
+
+RUN cargo cinstall -p gst-plugin-webrtc --release \
+  --prefix=/opt/gst-prefix \
+  --libdir=/opt/gst-prefix/lib/x86_64-linux-gnu
+
+FROM ubuntu:24.04 AS cpp-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    cmake \
+    pkg-config \
+    libglib2.0-dev \
+    libgstreamer1.0-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY whip-publish-cpp /build/whip-publish-cpp
+
+RUN cmake -S /build/whip-publish-cpp -B /build/whip-publish-cpp/build \
+      -DCMAKE_BUILD_TYPE=Release \
+  && cmake --build /build/whip-publish-cpp/build --config Release -j"$(nproc)"
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    MEDIAMTX_WHIP_BASE=http://mediamtx:8889 \
+    VIDEO_PATH=/app/test.mp4
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-nice \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    libglib2.0-0 \
+    libssl3 \
+    libnice10 \
+    libsrtp2-1 \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=plugin-builder /opt/gst-prefix/lib/x86_64-linux-gnu/gstreamer-1.0/ \
+  /usr/lib/x86_64-linux-gnu/gstreamer-1.0/
+
+WORKDIR /app
+
+COPY --from=cpp-builder /build/whip-publish-cpp/build/whip-publish-cpp /app/whip-publish-cpp
+COPY test.jpeg ./test.jpeg
+COPY test.mp4 ./test.mp4
+
+RUN chmod +x /app/whip-publish-cpp \
+  && gst-inspect-1.0 whipclientsink >/dev/null \
+  && /app/whip-publish-cpp --help >/dev/null
+
+CMD ["/app/whip-publish-cpp"]
